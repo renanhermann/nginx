@@ -130,7 +130,7 @@ spec:
       volumes:
         - configMap:
             defaultMode: 420
-            name: nginx-conf
+            name: nginx-proxy-config-cookpit-prod
           name: nginx-proxy-config-cookpit-prod
 ---
 apiVersion: apps/v1
