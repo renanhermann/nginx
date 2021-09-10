@@ -73,5 +73,5 @@ spec:
       volumes:
         - configMap:
             defaultMode: 420
-            name:  proxy-reverse-to-hana
+            name: nginx-conf
           name: proxy-reverse-to-hana
