@@ -163,7 +163,7 @@ spec:
       volumes:
         - configMap:
             defaultMode: 420
-            name: nginx-conf
+            name: nginx-proxy-config-cookpit-qa
           name: nginx-proxy-config-cookpit-qa
 ---
 apiVersion: networking.k8s.io/v1beta1
