@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1alpha3
+kind: Certificate
+metadata:
+  name: cert-wildcard
+  namespace: default
+spec:
+  secretName: cert-wildcard
+  dnsNames:
+    - "*.g2ldigital.com"
+  issuerRef:
+    name: letsencrypt-k3s
+    kind: Issuer

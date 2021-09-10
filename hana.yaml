@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: proxy-reverse-to-hana
+  namespace: default
+data:
+  nginx.conf: |-
+
+    user  nginx;
+    worker_processes  1;
+
+    error_log  /var/log/nginx/error.log warn;
+    pid        /var/run/nginx.pid;
+
+    events {
+        worker_connections  1024;
+    }
+
+    stream {
+      upstream hana {
+        server 10.140.81.160:34441;
+      }
+        server {
+          listen        34441;
+          proxy_pass    hana;
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: proxy-reverse-to-hana
+  name: proxy-reverse-to-hana
+  namespace: default
+spec:
+  ports:
+    - name: hana
+      port: 34441
+      protocol: TCP
+      targetPort: 34441
+  selector:
+    app: proxy-reverse-to-hana
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxy-reverse-to-hana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proxy-reverse-to-hana
+  template:
+    metadata:
+      labels:
+        app: proxy-reverse-to-hana
+    spec:
+      containers:
+        - image: nginx:alpine
+          imagePullPolicy: IfNotPresent
+          name: proxy-reverse-to-hana
+          ports:
+            - containerPort: 34441
+              protocol: TCP
+          resources: {}
+          volumeMounts:
+            - mountPath: /etc/nginx/nginx.conf
+              name: proxy-reverse-to-hana
+              subPath: nginx.conf
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: nginx-conf
+          name: proxy-reverse-to-hana

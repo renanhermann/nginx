@@ -1,0 +1,203 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-proxy-config-cookpit-prod
+  namespace: default
+data:
+  nginx.conf: |-
+    user  nginx;
+    worker_processes  1;
+
+    error_log  /var/log/nginx/error.log warn;
+    pid        /var/run/nginx.pid;
+
+    events {
+        worker_connections  1024;
+    }
+
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+
+        sendfile        on;
+        keepalive_timeout  65;
+
+        server {
+            listen 80;
+            location / {
+              resolver 172.20.0.10;
+              proxy_pass "http://10.140.32.160:8080";
+              proxy_set_header X-Forwarded-Host $http_host;
+            }
+        }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-proxy-config-cookpit-qa
+  namespace: default
+data:
+  nginx.conf: |-
+    user  nginx;
+    worker_processes  1;
+
+    error_log  /var/log/nginx/error.log warn;
+    pid        /var/run/nginx.pid;
+
+    events {
+        worker_connections  1024;
+    }
+
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+
+        sendfile        on;
+        keepalive_timeout  65;
+
+        server {
+            listen 80;
+            location / {
+              resolver 172.20.0.10;
+              proxy_pass "http://10.149.100.18:8080";
+              proxy_set_header X-Forwarded-Host $http_host;
+            }
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: nginx-proxy-cookpit-prod
+  name: nginx-proxy-service-cookpit-prod
+  namespace: default
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: nginx-proxy-cookpit-prod
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: nginx-proxy-cookpit-qa
+  name: nginx-proxy-service-cookpit-qa
+  namespace: default
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: nginx-proxy-cookpit-qa
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-proxy-cookpit-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-proxy-cookpit-prod
+  template:
+    metadata:
+      labels:
+        app: nginx-proxy-cookpit-prod
+    spec:
+      containers:
+        - image: nginx:alpine
+          imagePullPolicy: IfNotPresent
+          name: nginx-proxy-cookpit-prod
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          resources: {}
+          volumeMounts:
+            - mountPath: /etc/nginx/nginx.conf
+              name: nginx-proxy-config-cookpit-prod
+              subPath: nginx.conf
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: nginx-conf
+          name: nginx-proxy-config-cookpit-prod
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-proxy-cookpit-qa
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-proxy-cookpit-qa
+  template:
+    metadata:
+      labels:
+        app: nginx-proxy-cookpit-qa
+    spec:
+      containers:
+        - image: nginx:alpine
+          imagePullPolicy: IfNotPresent
+          name: nginx-proxy-cookpit-qa
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          resources: {}
+          volumeMounts:
+            - mountPath: /etc/nginx/nginx.conf
+              name: nginx-proxy-config-cookpit-qa
+              subPath: nginx.conf
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: nginx-conf
+          name: nginx-proxy-config-cookpit-qa
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/issuer: letsencrypt-k3s
+    external-dns.alpha.kubernetes.io/hostname: cookpit-neolog-qa.g2ldigital.com
+  name: echo-ingress-cookpit-qa
+spec:
+  rules:
+    - host: cookpit-neolog-qa.g2ldigital.com
+      http:
+        paths:
+          - path:
+            backend:
+              serviceName: nginx-proxy-service-cookpit-qa
+              servicePort: 80
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/issuer: letsencrypt-k3s
+    external-dns.alpha.kubernetes.io/hostname: cookpit-neolog-prod.g2ldigital.com
+  name: echo-ingress-cookpit-prod
+spec:
+  rules:
+    - host: cookpit-neolog-prod.g2ldigital.com
+      http:
+        paths:
+          - path:
+            backend:
+              serviceName: nginx-proxy-service-cookpit-prod
+              servicePort: 80
