@@ -200,4 +200,4 @@ spec:
           - path:
             backend:
               serviceName: nginx-proxy-service-cookpit-prod
-              servicePort: 80
+              servicePort: 8081
