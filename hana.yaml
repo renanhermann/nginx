@@ -1,77 +1,49 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: proxy-reverse-to-hana
-  namespace: default
-data:
-  nginx.conf: |-
-
-    user  nginx;
-    worker_processes  1;
-
-    error_log  /var/log/nginx/error.log warn;
-    pid        /var/run/nginx.pid;
-
-    events {
-        worker_connections  1024;
-    }
-
-    stream {
-      upstream hana {
-        server 10.140.81.160:34441;
-      }
-        server {
-          listen        34441;
-          proxy_pass    hana;
-      }
-    }
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    name: proxy-reverse-to-hana
-  name: proxy-reverse-to-hana
-  namespace: default
-spec:
-  ports:
-    - name: hana
-      port: 34441
-      protocol: TCP
-      targetPort: 34441
-  selector:
-    app: proxy-reverse-to-hana
-  type: NodePort
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: proxy-reverse-to-hana
+  annotations: {}
+  generation: 7
+  name: nginx-proxy
+  namespace: default
 spec:
+  progressDeadlineSeconds: 600
   replicas: 1
+  revisionHistoryLimit: 10
   selector:
     matchLabels:
-      app: proxy-reverse-to-hana
+      app: nginx-proxy
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
   template:
     metadata:
+      annotations: {}
       labels:
-        app: proxy-reverse-to-hana
+        app: nginx-proxy
     spec:
       containers:
-        - image: nginx:alpine
-          imagePullPolicy: IfNotPresent
-          name: proxy-reverse-to-hana
-          ports:
-            - containerPort: 34441
-              protocol: TCP
-          resources: {}
-          volumeMounts:
-            - mountPath: /etc/nginx/nginx.conf
-              name: proxy-reverse-to-hana
-              subPath: nginx.conf
+      - image: nginx:alpine
+        imagePullPolicy: IfNotPresent
+        name: nginx-proxy
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/nginx/nginx.conf
+          name: nginx-proxy-config
+          subPath: nginx.conf
+      dnsPolicy: ClusterFirst
       restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
       volumes:
-        - configMap:
-            defaultMode: 420
-            name: proxy-reverse-to-hana
-          name: proxy-reverse-to-hana
+      - configMap:
+          defaultMode: 420
+          name: nginx-conf
+        name: nginx-proxy-config
